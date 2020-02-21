@@ -1,3 +1,8 @@
 ﻿  client.cpp
-D:\Labs\socket-chat\chat-client\client.cpp(151,1): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+D:\Labs\socket-chat\chat-client\client.cpp(8,10): warning C4067: unexpected tokens following preprocessor directive - expected a newline
+D:\Labs\socket-chat\chat-client\client.cpp(126,1): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+D:\Labs\socket-chat\chat-client\client.cpp(109,7): warning C4101: 'iResult': unreferenced local variable
+D:\Labs\socket-chat\chat-client\client.cpp(203,27): warning C4101: 'e': unreferenced local variable
+D:\Labs\socket-chat\chat-client\client.cpp(224,7): warning C4101: 'port': unreferenced local variable
+D:\Labs\socket-chat\chat-client\client.cpp(223,7): warning C4101: 'ip': unreferenced local variable
   chat-client.vcxproj -> D:\Labs\socket-chat\x64\Debug\chat-client.exe

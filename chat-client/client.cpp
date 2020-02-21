@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <exception>
+#include <thread>
 #include <shared_mutex>;
 #include <windows.h>
 #include <winsock2.h>
@@ -15,20 +16,6 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 #define DEFAULT_BUFLEN 512
-
-int recvbuflen = DEFAULT_BUFLEN;
-char recvbuf[DEFAULT_BUFLEN];
-int sendbuflen = DEFAULT_BUFLEN;
-char sendbuf[DEFAULT_BUFLEN] = "Hi";
-
-WSADATA wsaData;
-int iResult, iSendResult;
-struct addrinfo* result = NULL, * ptr = NULL, hints;
-SOCKET ConnectSocket = INVALID_SOCKET;
-
-int inputbuflen = DEFAULT_BUFLEN;
-char inputbuf[DEFAULT_BUFLEN];
-char err[100];
 
 class Client {
 private:
@@ -50,6 +37,13 @@ private:
 	char err[100];
 
 	char prefix = '/';
+
+	std::thread recvThread;
+	std::thread sendThread;
+
+	int isRunning = 1;
+
+	std::shared_mutex sharedMutex;
 
 public:
 	Client(const char* ip, const char* port) {
@@ -91,6 +85,79 @@ public:
 
 	}
 
+	void stopServer() {
+
+		// shutdown
+		printf(">> Shutdown the SOCKET... ");
+		iResult = shutdown(ConnectSocket, SD_SEND);
+		if (iResult == SOCKET_ERROR) {
+			sprintf_s(err, "shutdown failed: %d\r\n", WSAGetLastError());
+			closesocket(ConnectSocket);
+			WSACleanup();
+
+			throw new std::exception(err);
+		}
+		printf("\t\tCOMPLETED\r\n");
+
+		// cleanup
+		closesocket(ConnectSocket);
+		WSACleanup();
+		return;
+	}
+
+	void sendChat() {
+		int iResult;
+		do {
+			//std::unique_lock<std::shared_mutex> lock(sharedMutex);
+
+			/*----LOCK----*/
+
+			printf("ME >> ");
+			std::cin >> inputbuf;
+
+			if (inputbuf[0] == prefix) {
+				if (strcmp(inputbuf, "/exit") == 0) {
+					isRunning = 0;
+					stopServer();
+					return;
+				}
+			}
+			else {
+				send(ConnectSocket, inputbuf, strlen(inputbuf), 0);
+			}
+			//lock.unlock();
+
+			/*----UNLOCK----*/
+
+		} while (isRunning);
+	}
+
+	void recvChat() {
+		int iResult;
+		int recvbuflen = DEFAULT_BUFLEN;
+		char recvbuf[DEFAULT_BUFLEN] = "";
+		do {
+			memset(recvbuf, 0, sizeof(recvbuf));
+			iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
+			if (iResult > 0) {
+				//std::unique_lock<std::shared_mutex> lock(sharedMutex);
+
+				/*----LOCK----*/
+
+				printf("\r");
+				printf(recvbuf);
+				printf("ME >> ");
+
+				/*----UNLOCK----*/
+				//lock.unlock();
+			}
+			else if (iResult == SOCKET_ERROR) {
+				printf("\r\n>> DISCONNECTED!\r\n");
+				break;
+			}
+		} while (isRunning);
+	}
+
 	void run() {
 
 		// Attempt to connect to an address
@@ -130,45 +197,22 @@ public:
 			throw new std::exception(err);
 		}
 
-
-		if (ConnectSocket == INVALID_SOCKET) {
-			printf("ERROR INVALID SOCKET\r\n");
-			WSACleanup();
-
-			throw new std::exception(err);
+		try {
+			setsockopt(ConnectSocket, SOL_SOCKET, SO_RCVTIMEO, "50", 2);
+		}
+		catch (std::exception & e) {
+			printf(">> set socket option error\r\n");
 		}
 
-		int isRunning = 1;
-		do {
-			printf(">> ");
-			std::cin >> inputbuf;
+		printf("\r\n-------- LOBBY --------\r\n");
 
-			if (inputbuf[0] == prefix) {
-				if (strcmp(inputbuf, "/exit") == 0) {
-					isRunning = 0;
-				}
-			}
-			else {
-				send(ConnectSocket, inputbuf, strlen(inputbuf), 0);
-			}
-		} while (isRunning);
+		recvThread = std::thread(&Client::recvChat, this);
+		sendThread = std::thread(&Client::sendChat, this);
 
-		// shutdown
-		printf(">> Shutdown the SOCKET... ");
-		iResult = shutdown(ConnectSocket, SD_SEND);
-		if (iResult == SOCKET_ERROR) {
-			sprintf_s(err, "shutdown failed: %d\r\n", WSAGetLastError());
-			closesocket(ConnectSocket);
-			WSACleanup();
+		recvThread.join();
+		sendThread.join();
 
-			throw new std::exception(err);
-		}
-		printf("\t\tCOMPLETED\r\n");
-
-		// cleanup
-		closesocket(ConnectSocket);
-		WSACleanup();
-		return;
+		stopServer();
 	}
 };
 
@@ -178,14 +222,15 @@ int main()
 
 	char ip[20];
 	char port[10];
-
+	/*
 	printf(">> IP ADDRESS : ");
 	std::cin >> ip;
 	printf(">> PORT       : ");
 	std::cin >> port;
-
+	*/
 	try {
-		Client client(ip, port);
+		//Client client(ip, port);
+		Client client("127.0.0.1", "8080");
 		client.run();
 	}
 	catch (std::exception & e) {

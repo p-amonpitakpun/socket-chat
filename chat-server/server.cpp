@@ -112,21 +112,34 @@ public:
 		printf(">> ---- handle new client (%d)\r\n", (int)id);
 		int iResult;
 		int recvbuflen = DEFAULT_BUFLEN;
-		char recvbuf[DEFAULT_BUFLEN];
+		char recvbuf[DEFAULT_BUFLEN] = "";
+		int sbuflen = DEFAULT_BUFLEN;
+		char sbuf[DEFAULT_BUFLEN] = "";
+
 		do {
 			iResult = recv(clientSocket, recvbuf, recvbuflen, 0);
 			if (iResult > 0) {
-				printf(">> client[%d] send %d Bytes\r\n", (int)id, iResult);
+				printf(">> client[%d] send %d Bytes :: %s\r\n", (int)id, iResult, recvbuf);
 
 				// send to all other client
 				for (Client client : clients) {
 					if (client.id != id) {
-						send(client.socket, recvbuf, recvbuflen, 0);
+						snprintf(sbuf, DEFAULT_BUFLEN, "client[%d] >> %s\r\n", (int)client.id, recvbuf);
+						send(client.socket, sbuf, strlen(sbuf), 0);
+						memset(sbuf, 0, sizeof(sbuf));
 					}
 				}
 			}
 		} while (iResult > 0);
 		printf(">> client[%d] disconnected\r\n", (int)id);
+		// send to all other client
+		for (Client client : clients) {
+			if (client.id != id) {
+				sprintf_s(sbuf, ">> client(%d) left.\r\n", (int)id);
+				send(client.socket, sbuf, strlen(sbuf), 0);
+				memset(sbuf, 0, sizeof(sbuf));
+			}
+		}
 	}
 
 	int run() {
@@ -147,14 +160,23 @@ public:
 			while (clientThreads.size() > SOMAXCONN);
 
 			try {
-				printf(">> wait for client to connect\r\n");
 				SOCKET newClientSocket = accept(ListenSocket, NULL, NULL);
 				if (newClientSocket == INVALID_SOCKET) {
 					printf(">> accept failed: %d\r\n", WSAGetLastError());
 					continue;
 				}
-				printf(">> new client(%zu) connected.\r\n", id);
+				printf(">> new client(%d) connected.\r\n", (int)id);
+				sprintf_s(sendbuf, ">> client(%d) joined.\r\n", (int)id);
+				for (Client client : clients) {
+					if (client.id != id)
+						send(client.socket, sendbuf, sendbuflen, 0);
+				}
 
+				Client client;
+				client.id = id;
+				client.socket = newClientSocket;
+
+				clients.push_back(client);
 				clientThreads.push_back(std::thread(&Server::handleClient, this, id, newClientSocket));
 			}
 			catch (std::exception & e) {
