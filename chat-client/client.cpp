@@ -4,16 +4,17 @@
 
 #include <iostream>
 #include <exception>
+#include <shared_mutex>;
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 #include <stdio.h>
+#include <conio.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 
 #define DEFAULT_BUFLEN 512
-#define PORT "8080"
 
 int recvbuflen = DEFAULT_BUFLEN;
 char recvbuf[DEFAULT_BUFLEN];
@@ -31,7 +32,8 @@ char err[100];
 
 class Client {
 private:
-	char port[10] = "8080";
+	char IP[20] = "127.0.0.1";
+	char PORT[10] = "8080";
 
 	int recvbuflen = DEFAULT_BUFLEN;
 	char recvbuf[DEFAULT_BUFLEN];
@@ -50,7 +52,10 @@ private:
 	char prefix = '/';
 
 public:
-	Client() {
+	Client(const char* ip, const char* port) {
+
+		strcpy_s(IP, ip);
+		strcpy_s(PORT, port);
 
 		// Initialize Winsock
 		printf(">> Initialize Winsock... ");
@@ -171,22 +176,27 @@ int main()
 {
 	printf("/* --- Socket Chat Client --- */\r\n");
 
+	char ip[20];
+	char port[10];
+
+	printf(">> IP ADDRESS : ");
+	std::cin >> ip;
+	printf(">> PORT       : ");
+	std::cin >> port;
+
 	try {
-		Client client;
+		Client client(ip, port);
 		client.run();
 	}
 	catch (std::exception & e) {
 		printf(e.what());
 
-		printf("press KEY to exit.");
-		std::cin.sync();
-		std::cin.get();
+		printf("press any key to exit...");
+		_getch();
 		return 1;
 	}
 
-	printf("client end\r\n");
-	printf("press KEY to exit.");
-	std::cin.sync();
-	std::cin.get();
+	printf("press any key to exit...");
+	_getch();
 	return 0;
 }
